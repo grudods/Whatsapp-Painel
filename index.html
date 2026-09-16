@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel WhatsApp - DS Digital</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* SIDEBAR - Lista de Conversas */
+        .sidebar {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-header {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .conversas-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .conversa-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .conversa-item.aguardando {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        .conversa-item.em-atendimento {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+
+        .conversa-item.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .conversa-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .conversa-nome {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .conversa-preview {
+            font-size: 12px;
+            opacity: 0.7;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* MAIN - Chat */
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .chat-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        /* MESSAGES */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.cliente {
+            justify-content: flex-start;
+        }
+
+        .message.funcionario {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 60%;
+            padding: 12px 15px;
+            border-radius: 10px;
+            word-wrap: break-word;
+            font-size: 14px;
+        }
+
+        .message.cliente .message-bubble {
+            background: #e8eaed;
+            color: #333;
+            border-bottom-left-radius: 0;
+        }
+
+        .message.funcionario .message-bubble {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        /* INPUT */
+        .chat-input-area {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn-send {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-send:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #999;
+            font-size: 16px;
+            text-align: center;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>💬 Conversas</span>
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Online</span>
+                </div>
+            </div>
+            <div class="conversas-list" id="conversasList"></div>
+        </div>
+
+        <!-- MAIN CHAT -->
+        <div class="main-chat">
+            <!-- Chat Header -->
+            <div class="chat-header" id="chatHeader" style="display: none;">
+                <div class="chat-title" id="chatTitle">Selecione uma conversa</div>
+                <div class="chat-actions">
+                    <button class="btn btn-primary" id="btnMarcarConcluida">✓ Concluída</button>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            <div class="messages-container" id="messagesContainer">
+                <div class="placeholder">Selecione uma conversa para começar</div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input-area" id="chatInputArea" style="display: none;">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Digite sua resposta..."
+                    autocomplete="off"
+                >
+                <button class="btn-send" id="btnEnviar">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== FIREBASE CONFIG =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyCovKCaX96VMNb63F76cqOJbVEDhBBomVE",
+            projectId: "ds-painel-whatsapp",
+            databaseURL: "https://ds-painel-whatsapp-default-rtdb.firebaseio.com/",
+            authDomain: "ds-painel-whatsapp.firebaseapp.com",
+            storageBucket: "ds-painel-whatsapp.appspot.com",
+            messagingSenderId: "824404578257",
+            appId: "1:824404578257:web:7a48fc57db267f6ccdaf0"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // ===== VARIABLES =====
+        let conversaSelecionada = null;
+        let conversas = {};
+        let operador = null;
+
+        // ===== INICIALIZAR =====
+        window.addEventListener('load', () => {
+            operador = localStorage.getItem('operador') || 'Operador ' + Math.floor(Math.random() * 1000);
+            const nomeOperador = prompt('Qual é seu nome?', operador);
+            if (nomeOperador) {
+                operador = nomeOperador;
+                localStorage.setItem('operador', operador);
+            }
+            
+            carregarConversas();
+            setupFirebaseListeners();
+        });
+
+        // ===== CARREGAR CONVERSAS DO FIREBASE =====
+        function carregarConversas() {
+            database.ref('conversas').on('value', (snapshot) => {
+                conversas = snapshot.val() || {};
+                atualizarListaConversas();
+                
+                // Se temos uma conversa selecionada, atualizar as mensagens
+                if (conversaSelecionada) {
+                    exibirMensagens(conversaSelecionada);
+                }
+            });
+        }
+
+        // ===== SETUP FIREBASE LISTENERS =====
+        function setupFirebaseListeners() {
+            database.ref('conversas').on('child_added', (snapshot) => {
+                const conversa_id = snapshot.key;
+                conversas[conversa_id] = snapshot.val();
+                atualizarListaConversas();
+            });
+
+            database.ref('conversas').on('child_changed', (snapshot) => {
+                const conversa_id = snapshot.key;
+                conversas[conversa_id] = snapshot.val();
+                atualizarListaConversas();
+                
+                if (conversaSelecionada === conversa_id) {
+                    exibirMensagens(conversa_id);
+                }
+            });
+        }
+
+        // ===== ATUALIZAR LISTA DE CONVERSAS =====
+        function atualizarListaConversas() {
+            const lista = document.getElementById('conversasList');
+            lista.innerHTML = '';
+
+            const conversasArray = Object.entries(conversas)
+                .map(([id, data]) => ({ id, ...data }))
+                .sort((a, b) => new Date(b.ultima_atualizacao || 0) - new Date(a.ultima_atualizacao || 0));
+
+            conversasArray.forEach(conversa => {
+                const div = document.createElement('div');
+                div.className = `conversa-item ${conversa.status || 'aguardando'}`;
+                if (conversaSelecionada === conversa.id) {
+                    div.classList.add('active');
+                }
+
+                div.innerHTML = `
+                    <div class="conversa-nome">${conversa.sender || 'Desconhecido'}</div>
+                    <div class="conversa-preview">${conversa.ultima_mensagem || 'Sem mensagens'}</div>
+                `;
+
+                div.addEventListener('click', () => selecionarConversa(conversa.id));
+                lista.appendChild(div);
+            });
+        }
+
+        // ===== SELECIONAR CONVERSA =====
+        function selecionarConversa(conversa_id) {
+            conversaSelecionada = conversa_id;
+            
+            // Marcar como em atendimento
+            database.ref(`conversas/${conversa_id}`).update({
+                status: 'em-atendimento',
+                operador_atendimento: operador
+            });
+
+            exibirMensagens(conversa_id);
+            atualizarListaConversas();
+        }
+
+        // ===== EXIBIR MENSAGENS =====
+        function exibirMensagens(conversa_id) {
+            const conversa = conversas[conversa_id];
+            const container = document.getElementById('messagesContainer');
+
+            document.getElementById('chatHeader').style.display = 'flex';
+            document.getElementById('chatInputArea').style.display = 'flex';
+            document.getElementById('chatTitle').textContent = conversa.sender || 'Conversa';
+
+            container.innerHTML = '';
+
+            const mensagens = conversa.mensagens || [];
+            mensagens.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.tipo}`;
+
+                const bubble = document.createElement('div');
+                bubble.className = 'message-bubble';
+                bubble.textContent = msg.texto;
+
+                div.appendChild(bubble);
+                container.appendChild(div);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // ===== ENVIAR MENSAGEM =====
+        document.getElementById('btnEnviar').addEventListener('click', enviarMensagem);
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') enviarMensagem();
+        });
+
+        function enviarMensagem() {
+            const input = document.getElementById('messageInput');
+            const texto = input.value.trim();
+
+            if (!texto || !conversaSelecionada) return;
+
+            const conversa = conversas[conversaSelecionada];
+            const novasMensagens = (conversa.mensagens || []).concat([
+                {
+                    tipo: 'funcionario',
+                    texto: texto,
+                    timestamp: new Date().toISOString(),
+                    operador: operador
+                }
+            ]);
+
+            database.ref(`conversas/${conversaSelecionada}`).update({
+                mensagens: novasMensagens,
+                ultima_mensagem: texto,
+                ultima_atualizacao: new Date().toISOString()
+            });
+
+            input.value = '';
+        }
+
+        // ===== MARCAR CONCLUÍDA =====
+        document.getElementById('btnMarcarConcluida').addEventListener('click', () => {
+            if (conversaSelecionada) {
+                database.ref(`conversas/${conversaSelecionada}`).update({
+                    status: 'concluida'
+                });
+
+                conversaSelecionada = null;
+                atualizarListaConversas();
+
+                document.getElementById('chatHeader').style.display = 'none';
+                document.getElementById('chatInputArea').style.display = 'none';
+                document.getElementById('messagesContainer').innerHTML = 
+                    '<div class="placeholder">Selecione uma conversa para começar</div>';
+            }
+        });
+    </script>
+</body>
+</html>
