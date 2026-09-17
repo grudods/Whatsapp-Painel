@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build",
   "outputDirectory": ".",
-  "buildCommand": "echo 'Building'"
+  "ignoreCommand": "git diff --quiet HEAD~1 HEAD -- .env"
 }
