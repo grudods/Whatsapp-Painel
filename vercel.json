@@ -1,0 +1,9 @@
+{
+  "outputDirectory": ".",
+  "buildCommand": "npm run build",
+  "functions": {
+    "api/webhook.js": {
+      "maxDuration": 30
+    }
+  }
+}
