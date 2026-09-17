@@ -3,7 +3,7 @@
   "outputDirectory": ".",
   "functions": {
     "api/**/*.js": {
-      "runtime": "node24.x"
+      "runtime": "nodejs24.x"
     }
   }
 }
